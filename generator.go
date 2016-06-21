@@ -349,6 +349,17 @@ func (g *generator) getContainers() ([]*RuntimeContainer, error) {
 		SetServerInfo(apiInfo)
 	}
 
+	env, err := g.Client.Version()
+	var apiVersion docker.APIVersion
+	if err != nil {
+		log.Printf("Error retrieving docker version info: %s\n", err)
+	} else {
+		apiVersion, err = docker.NewAPIVersion(env.Get("ApiVersion"))
+		if err != nil {
+			log.Printf("Error parsing docker API string: %s\n", err)
+		}
+	}
+
 	apiContainers, err := g.Client.ListContainers(docker.ListContainersOptions{
 		All:  g.All,
 		Size: false,
@@ -378,22 +389,15 @@ func (g *generator) getContainers() ([]*RuntimeContainer, error) {
 			},
 			Name:         strings.TrimLeft(container.Name, "/"),
 			Hostname:     container.Config.Hostname,
-			Gateway:      container.NetworkSettings.Gateway,
 			Addresses:    []Address{},
 			Networks:     []Network{},
 			Env:          make(map[string]string),
 			Volumes:      make(map[string]Volume),
 			Node:         SwarmNode{},
 			Labels:       make(map[string]string),
-			IP:           container.NetworkSettings.IPAddress,
-			IP6LinkLocal: container.NetworkSettings.LinkLocalIPv6Address,
-			IP6Global:    container.NetworkSettings.GlobalIPv6Address,
 		}
 		for k, v := range container.NetworkSettings.Ports {
 			address := Address{
-				IP:           container.NetworkSettings.IPAddress,
-				IP6LinkLocal: container.NetworkSettings.LinkLocalIPv6Address,
-				IP6Global:    container.NetworkSettings.GlobalIPv6Address,
 				Port:         k.Port(),
 				Proto:        k.Proto(),
 			}
@@ -416,6 +420,23 @@ func (g *generator) getContainers() ([]*RuntimeContainer, error) {
 				MacAddress:          v.MacAddress,
 				GlobalIPv6PrefixLen: v.GlobalIPv6PrefixLen,
 				IPPrefixLen:         v.IPPrefixLen,
+			}
+
+			runtimeContainer.Networks = append(runtimeContainer.Networks,
+				network)
+		}
+		// Backwards compatibility for older Docker APIs
+		apiVersion1_21, err := docker.NewAPIVersion("1.21")
+		if apiVersion.LessThan(apiVersion1_21) {
+			network := Network{
+				IP:                container.NetworkSettings.IPAddress,
+				Name:              "bridge",
+				Gateway:           container.NetworkSettings.Gateway,
+				EndpointID:        container.NetworkSettings.EndpointID,
+				IPv6Gateway:       container.NetworkSettings.IPv6Gateway,
+				GlobalIPv6Address: container.NetworkSettings.GlobalIPv6Address,
+				MacAddress:        container.NetworkSettings.MacAddress,
+				IPPrefixLen:       container.NetworkSettings.IPPrefixLen,
 			}
 
 			runtimeContainer.Networks = append(runtimeContainer.Networks,

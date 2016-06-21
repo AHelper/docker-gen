@@ -85,7 +85,6 @@ type RuntimeContainer struct {
 	ID           string
 	Addresses    []Address
 	Networks     []Network
-	Gateway      string
 	Name         string
 	Hostname     string
 	Image        DockerImage
@@ -93,9 +92,6 @@ type RuntimeContainer struct {
 	Volumes      map[string]Volume
 	Node         SwarmNode
 	Labels       map[string]string
-	IP           string
-	IP6LinkLocal string
-	IP6Global    string
 	Mounts       []Mount
 	State        State
 }
